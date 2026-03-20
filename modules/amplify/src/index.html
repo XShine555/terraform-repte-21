@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mensajería WebSocket</title>
+  <style>
+    body { font-family: Arial; margin: 2em; }
+    #chat { border: 1px solid #ccc; height: 300px; overflow-y: auto; margin-bottom: 1em; padding: 1em; }
+    #msg { width: 80%; }
+    #send { width: 18%; }
+  </style>
+</head>
+<body>
+  <h2>Mensajería WebSocket</h2>
+  <div id="chat"></div>
+  <input id="msg" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
+  <button id="send">Enviar</button>
+  <script>
+    const DEFAULT_STAGE = 'dev';
+    const DEFAULT_WS_URL = 'wss://ffcq2hjope.execute-api.us-east-1.amazonaws.com/dev/';
+
+    function buildWebSocketUrl(rawUrl) {
+      if (!rawUrl) return DEFAULT_WS_URL;
+      try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === 'https:') parsed.protocol = 'wss:';
+        if (parsed.protocol === 'http:') parsed.protocol = 'ws:';
+        if (!parsed.pathname || parsed.pathname === '/') {
+          parsed.pathname = `/${DEFAULT_STAGE}`;
+        }
+        return parsed.toString().replace(/\/$/, '');
+      } catch {
+        return rawUrl.replace(/\/$/, '');
+      }
+    }
+
+    const wsUrl = buildWebSocketUrl(window.WS_API_URL || DEFAULT_WS_URL);
+    const chat = document.getElementById('chat');
+    const msgInput = document.getElementById('msg');
+    const sendBtn = document.getElementById('send');
+    const ws = new WebSocket(wsUrl);
+
+    const addLine = (text, italic = false) => {
+      const line = document.createElement('div');
+      if (italic) {
+        const em = document.createElement('em');
+        em.textContent = text;
+        line.appendChild(em);
+      } else {
+        line.textContent = text;
+      }
+      chat.appendChild(line);
+      chat.scrollTop = chat.scrollHeight;
+    };
+
+    ws.onopen = () => addLine(`Conectado a ${wsUrl}`, true);
+    ws.onmessage = (event) => addLine(event.data);
+    ws.onclose = () => addLine('Desconectado', true);
+    ws.onerror = () => addLine('Error de conexión WebSocket', true);
+
+    const sendMessage = () => {
+      const msg = msgInput.value.trim();
+      if (!msg) return;
+      if (ws.readyState !== WebSocket.OPEN) {
+        addLine('La conexión aún no está abierta', true);
+        return;
+      }
+      ws.send(JSON.stringify({ action: 'sendMessage', message: msg }));
+      msgInput.value = '';
+      msgInput.focus();
+    };
+
+    sendBtn.addEventListener('click', sendMessage);
+    msgInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
